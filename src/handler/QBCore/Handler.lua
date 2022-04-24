@@ -13,7 +13,14 @@ function QBCoreHandler:startListener()
 end
 
 function QBCoreHandler:getPlayers()
-    local users = FXServer:getFrameworkAPI().Functions.GetQBPlayers()
+    local users = {}
+    local _, err = pcall(function()
+        users = FXServer:getFrameworkAPI().Functions.GetQBPlayers()
+    end)
+    if (err) then
+        users = FXServer:getFrameworkAPI().Players
+    end
+
     local usersList = {}
 
     for src, player in pairs(users) do
@@ -369,7 +376,13 @@ function QBCoreHandler:alertMessage(message, color)
 end
 
 function QBCoreHandler:licenseToPlayerId(license)
-    local users = FXServer:getFrameworkAPI().Functions.GetQBPlayers()
+    local users = {}
+    local _, err = pcall(function()
+        users = FXServer:getFrameworkAPI().Functions.GetQBPlayers()
+    end)
+    if (err) then
+        users = FXServer:getFrameworkAPI().Players
+    end
     local id = nil
 
     for src, player in pairs(users) do

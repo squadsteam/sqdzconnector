@@ -50,6 +50,20 @@ function FXServer:getFramework()
         return serverFrameworkType;
     end
 
+    local customQBCore = Config:get('qbcore.custom_resource_name', nil)
+    if (customQBCore ~= nil and GetResourceState(customQBCore)) then
+        local d = promise.new()
+        TriggerEvent('QBCore:GetObject', function(obj)
+            QBCore = obj
+            serverFrameworkType = 'QBCore';
+            frameworkTable = QBCore;
+
+            return d:resolve(serverFrameworkType)
+        end)
+
+        return Citizen.Await(d)
+    end
+
     return nil;
 end
 

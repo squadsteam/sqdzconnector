@@ -3,6 +3,11 @@ SqdzConnector = {}
 function SqdzConnector:startup()
     Log:printWelcome(GetResourceMetadata('sqdzconnector', 'version'))
 
+    local configStatus = Config:load()
+    if (configStatus ~= true) then
+        return
+    end
+
     local framework = FXServer:getFramework()
     if (framework == nil) then
         Log:error('No framework has been found in this FXServer, currently supported frameworks are: vRP, QBCore')
@@ -14,11 +19,6 @@ function SqdzConnector:startup()
 
     Log:print('Registering commands...')
     TebexStoreCommand:register()
-
-    local configStatus = Config:load()
-    if (configStatus ~= true) then
-        return
-    end
 
     TriggerEvent('socket_startup', Config:get('node_url'), Config:get('token'), framework, GetResourceMetadata('sqdzconnector', 'version'))
 end
