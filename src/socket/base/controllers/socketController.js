@@ -10,7 +10,8 @@ class SocketController {
             auth: {
                 token: 'FXServer ' + key,
                 fxserverType: fxserver_type,
-                connectorVersion: version
+                connectorVersion: version,
+                transports: ["websocket"]
             },
 
             'reconnectionDelay': 30000,
