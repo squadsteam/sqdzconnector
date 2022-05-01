@@ -45,23 +45,30 @@ function FXServer:getFramework()
     end
 
     if QBCore ~= nil then
-        serverFrameworkType = 'QBCore';
-        frameworkTable = exports['qb-core']:GetCoreObject();
-        return serverFrameworkType;
+        local oxmysql = self:checkForOXMySQL()
+        if (oxmysql) then
+            serverFrameworkType = 'QBCore';
+            frameworkTable = exports['qb-core']:GetCoreObject();
+            return serverFrameworkType;
+        end
     end
 
     local customQBCore = Config:get('qbcore.custom_resource_name', nil)
+    local customQBCoreObject = Config:get('qbcore.custom_resource_object', 'QBCore')
     if (customQBCore ~= nil and GetResourceState(customQBCore)) then
-        local d = promise.new()
-        TriggerEvent('QBCore:GetObject', function(obj)
-            QBCore = obj
-            serverFrameworkType = 'QBCore';
-            frameworkTable = QBCore;
+        local oxmysql = self:checkForOXMySQL()
+        if (oxmysql) then
+            local d = promise.new()
+            TriggerEvent(customQBCoreObject .. ':GetObject', function(obj)
+                QBCore = obj
+                serverFrameworkType = 'QBCore';
+                frameworkTable = QBCore;
 
-            return d:resolve(serverFrameworkType)
-        end)
+                return d:resolve(serverFrameworkType)
+            end)
 
-        return Citizen.Await(d)
+            return Citizen.Await(d)
+        end
     end
 
     return nil;
@@ -81,4 +88,13 @@ end
 
 function FXServer:getAdditionalData(key)
     return additionalData[key];
+end
+
+function FXServer:checkForOXMySQL()
+    local ghmattimysql = Config:get('qbcore.ghmattimysql', false)
+    if (ghmattimysql == false and GetResourceState('oxmysql') == 'missing') then
+        Log:error("It seems that your server doesn't have 'oxmysql', if you want to use ghmattimysql instead, please set 'qbcore.ghmattimysql' to 'true' in your config.json")
+        return nil;
+    end
+    return true;
 end

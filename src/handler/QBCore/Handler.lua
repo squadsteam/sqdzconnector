@@ -148,8 +148,8 @@ local function GeneratePlate()
             FXServer:getFrameworkAPI().Shared.RandomInt(3) ..
             FXServer:getFrameworkAPI().Shared.RandomStr(2)
 
-    local result = OXMySQL.Sync.fetchScalar('SELECT plate FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE plate = ?', { plate })
-    if result then
+    local result = QBCoreHandler:sqlQuery('SELECT plate FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE plate = ?', { plate })
+    if #result > 0 then
         return GeneratePlate()
     else
         return plate:upper()
@@ -159,7 +159,7 @@ end
 function QBCoreHandler:getVehicles(user_id)
     local player = FXServer:getFrameworkAPI().Functions.GetPlayerByCitizenId(user_id)
     if (player ~= nil) then
-        local vehiclesData = OXMySQL.Sync.fetchAll('SELECT * FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE citizenid = ?', {
+        local vehiclesData = QBCoreHandler:sqlQuery('SELECT * FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE citizenid = ?', {
             player.PlayerData.citizenid,
         })
         local vehicles = {}
@@ -185,7 +185,7 @@ function QBCoreHandler:giveVehicle(user_id, model)
             local hash = GetHashKey(model);
 
             CreateThread(function()
-                OXMySQL.insert.await('INSERT INTO ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' (license, citizenid, vehicle, hash, mods, plate, state) VALUES (?, ?, ?, ?, ?, ?, ?)', {
+                QBCoreHandler:sqlQuery('INSERT INTO ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' (license, citizenid, vehicle, hash, mods, plate, state) VALUES (?, ?, ?, ?, ?, ?, ?)', {
                     player.PlayerData.license,
                     player.PlayerData.citizenid,
                     model,
@@ -206,7 +206,7 @@ function QBCoreHandler:removeVehicle(user_id, id)
     local player = FXServer:getFrameworkAPI().Functions.GetPlayerByCitizenId(user_id)
     if (player ~= nil) then
         CreateThread(function()
-            OXMySQL.query.await('DELETE FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE id = ? AND citizenid = ?', {
+            QBCoreHandler:sqlQuery('DELETE FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE id = ? AND citizenid = ?', {
                 id,
                 player.PlayerData.citizenid,
             })
@@ -220,7 +220,7 @@ function QBCoreHandler:removeVehicleByModel(user_id, model)
     local player = FXServer:getFrameworkAPI().Functions.GetPlayerByCitizenId(user_id)
     if (player ~= nil) then
         CreateThread(function()
-            OXMySQL.query.await('DELETE FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE vehicle = ? AND citizenid = ?', {
+            QBCoreHandler:sqlQuery('DELETE FROM ' .. Config:get('tables.qbcore.player_vehicles', 'player_vehicles'):gsub("%s+", "") .. ' WHERE vehicle = ? AND citizenid = ?', {
                 model,
                 player.PlayerData.citizenid,
             })
@@ -302,7 +302,7 @@ function QBCoreHandler:kick(user_id, reason)
 end
 
 function QBCoreHandler:getBans(page)
-    local bansData = OXMySQL.Sync.fetchAll('SELECT * FROM ' .. Config:get('tables.qbcore.bans', 'bans'):gsub("%s+", ""))
+    local bansData = QBCoreHandler:sqlQuery('SELECT * FROM ' .. Config:get('tables.qbcore.bans', 'bans'):gsub("%s+", ""))
     local bans = {}
 
     for k, v in pairs(bansData) do
@@ -343,7 +343,7 @@ function QBCoreHandler:ban(license, name, time, reason, bannedby)
     end
 
     CreateThread(function()
-        OXMySQL.insert.await('INSERT INTO ' .. Config:get('tables.qbcore.bans', 'bans'):gsub("%s+", "") .. ' (name, license, reason, expire, bannedby) VALUES (?, ?, ?, ?, ?)', {
+        QBCoreHandler:sqlQuery('INSERT INTO ' .. Config:get('tables.qbcore.bans', 'bans'):gsub("%s+", "") .. ' (name, license, reason, expire, bannedby) VALUES (?, ?, ?, ?, ?)', {
             name,
             'license:' .. license,
             reason,
@@ -354,7 +354,7 @@ function QBCoreHandler:ban(license, name, time, reason, bannedby)
     end)
 
     local src = FXServer:getFrameworkAPI().Functions.GetSource('license:' .. license)
-    if (src ~= nil) then
+    if (src ~= 0) then
         FXServer:getFrameworkAPI().Functions.Kick(src, reason, false, false)
     end
     return true
@@ -362,7 +362,7 @@ end
 
 function QBCoreHandler:unban(id)
     CreateThread(function()
-        OXMySQL.query.await('DELETE FROM ' .. Config:get('tables.qbcore.bans', 'bans'):gsub("%s+", "") .. ' WHERE id = ?', {
+        QBCoreHandler:sqlQuery('DELETE FROM ' .. Config:get('tables.qbcore.bans', 'bans'):gsub("%s+", "") .. ' WHERE id = ?', {
             id
         })
         Socket:broadcast('update_bans', {})
@@ -394,4 +394,47 @@ function QBCoreHandler:licenseToPlayerId(license)
     end
 
     return id
+end
+
+function QBCoreHandler:sqlQuery(query, params)
+    local ghmattimysql = Config:get('qbcore.ghmattimysql', false)
+
+    if (ghmattimysql) then
+        local d = promise.new()
+        QBCoreHandler:ghmattiMysqlExecuteSql(true, query, params, function(data)
+            return d:resolve(data)
+        end)
+        return Citizen.Await(d)
+    else
+        local d = promise.new()
+        OXMySQL.query(query, params, function(data)
+            return d:resolve(data)
+        end)
+        return Citizen.Await(d)
+    end
+end
+
+--
+-- This function is taken from QBCore (old version)
+-- All sources goes to QBCore
+--
+function QBCoreHandler:ghmattiMysqlExecuteSql(wait, query, params, cb)
+    local rtndata = {}
+    local waiting = true
+    exports['ghmattimysql']:execute(query, params, function(data)
+        if cb ~= nil and wait == false then
+            cb(data)
+        end
+        rtndata = data
+        waiting = false
+    end)
+    if wait then
+        while waiting do
+            Citizen.Wait(5)
+        end
+        if cb ~= nil and wait == true then
+            cb(rtndata)
+        end
+    end
+    return rtndata
 end
