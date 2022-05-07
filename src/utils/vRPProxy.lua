@@ -19,6 +19,14 @@ function module(rsc, path)
     else
         local code = LoadResourceFile(rsc, path..".lua")
         if code then
+            if (rsc == 'vrp_mysql' and path == 'MySQL') then
+                local asyncMySQL = Config:get('vrp.mysql_async', false)
+
+                if (asyncMySQL) then
+                    local codeMySQLAsync = LoadResourceFile('mysql-async', "lib/MySQL.lua")
+                    code = codeMySQLAsync .. '\n' .. code
+                end
+            end
             local f, err = load(code, rsc.."/"..path..".lua")
             if f then
                 local rets = table.pack(xpcall(f, debug.traceback))
