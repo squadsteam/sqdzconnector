@@ -33,13 +33,14 @@ function FXServer:getFramework()
         return serverFrameworkType;
     end
 
-    local QBCore = exports['qb-core']
+    local customExportQBCore = Config:get('qbcore.custom_export_core_name', 'qb-core')
+    local QBCore = exports[customExportQBCore]
 
     local val, err = pcall(function()
         QBCore.GetCoreObject()
     end)
     if (err) then
-        QBCore = null;
+        QBCore = nil;
     else
         QBCore = val;
     end
@@ -48,7 +49,7 @@ function FXServer:getFramework()
         local oxmysql = self:checkForOXMySQL()
         if (oxmysql) then
             serverFrameworkType = 'QBCore';
-            frameworkTable = exports['qb-core']:GetCoreObject();
+            frameworkTable = exports[customExportQBCore]:GetCoreObject();
             return serverFrameworkType;
         end
     end
