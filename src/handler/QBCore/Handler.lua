@@ -268,7 +268,7 @@ end
 function QBCoreHandler:message(user_id, message, color)
     local player = FXServer:getFrameworkAPI().Functions.GetPlayerByCitizenId(user_id)
     if (player ~= nil) then
-        GlobalHandler:sendMessage(player.source, message, color)
+        GlobalHandler:sendMessage(player.PlayerData.source, message, color)
     end
     return true
 end
